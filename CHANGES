@@ -1,0 +1,8 @@
+change log for volutil
+https://github.com/chaselgrove/volutil
+
+0.1.0 -- 10 May 2022
+
+    Initial version.
+
+    Utilities for neuroimaging volumes.
