@@ -12,29 +12,23 @@ import PIL.ImageDraw
 
 from .. import load_lut
 
+def arg_volume(fname):
+    try:
+        vol = nib.load(fname)
+    except FileNotFoundError:
+        raise argparse.ArgumentTypeError(f'{fname}: file not found')
+    except nib.filebasedimages.ImageFileError:
+        raise argparse.ArgumentTypeError(f'{fname}: unknown volume format')
+    if len(vol.shape) != 3:
+        msg = 'volume must have exactly three dimensions'
+        raise argparse.ArgumentTypeError(msg)
+    return vol
+
 def arg_direction_string(arg):
     d = arg.lower()
     if not all(c in 'sca' for c in d):
         raise argparse.ArgumentTypeError(f'bad direction string "{arg}"')
     return d
-
-def load_volume(fname):
-    """Load and validate a volume, reporting errors."""
-    try:
-        vol = nib.load(fname)
-    except FileNotFoundError:
-        print(f'{progname}: {fname}: file not found', file=sys.stderr)
-        return None
-    except nib.filebasedimages.ImageFileError:
-        print(f'{progname}: {fname}: unknown volume format', file=sys.stderr)
-        return None
-    if len(vol.shape) != 3:
-        print(
-            f'{progname}: {fname}: volume must have exactly three dimensions', 
-            file=sys.stderr
-        )
-        return None
-    return vol
 
 def get_fov(vol):
     """Get the field of view of a volume.
@@ -152,10 +146,15 @@ def main():
     progname = os.path.basename(sys.argv[0])
 
     parser = argparse.ArgumentParser(description=description, epilog=epilog)
-    parser.add_argument('input', help='base volume')
+    parser.add_argument('base_volume', 
+                        type=arg_volume, 
+                        metavar='input', 
+                        help='base volume')
     parser.add_argument('--base-lut', '-l', 
                         help='base volume LUT file')
-    parser.add_argument('--overlay', '-O', help='overlay volume')
+    parser.add_argument('--overlay', '-O', 
+                        type=arg_volume, 
+                        help='overlay volume')
     parser.add_argument('--overlay-lut', '-L', 
                         help='overlay volume LUT file')
     parser.add_argument('--size', '-s', type=int, help='image size')
@@ -175,41 +174,29 @@ def main():
 
     args = parser.parse_args()
 
-    base_volume = load_volume(args.input)
-    if not base_volume:
-        sys.exit(1)
-
     if args.base_lut:
         base_lut = load_lut(args.base_lut)
     else:
         base_lut = None
 
-    if args.overlay:
-        overlay_volume = load_volume(args.overlay)
-        if not overlay_volume:
-            sys.exit(1)
-        if args.overlay_lut:
-            overlay_lut = load_lut(args.overlay_lut)
-        else:
-            overlay_lut = None
-    else:
-        overlay_volume = None
-        overlay_lut = None
+    overlay_lut = None
+    if args.overlay and args.overlay_lut:
+        overlay_lut = load_lut(args.overlay_lut)
 
     if os.path.exists(args.output) and not args.force_overwrite:
         print(f'{progname}: {args.output} exists', file=sys.stderr)
         sys.exit(1)
 
-    fov = get_fov(base_volume)
+    fov = get_fov(args.base_volume)
 
     if args.size:
         size = args.size
     else:
-        size = max(base_volume.shape)
+        size = max(args.base_volume.shape)
 
     # calculate the low/mid/high coordinates
-    mid_ijk = np.append(np.array(base_volume.shape) / 2, 1)
-    mid_ras = np.matmul(base_volume.affine, mid_ijk)
+    mid_ijk = np.append(np.array(args.base_volume.shape) / 2, 1)
+    mid_ras = np.matmul(args.base_volume.affine, mid_ijk)
 
     Range = collections.namedtuple('Range', ['low', 'mid', 'high'])
     r = Range(mid_ras[0]-fov/2, mid_ras[0], mid_ras[0]+fov/2)
@@ -233,14 +220,14 @@ def main():
             tr = [r.low, a.high, s.mid]
             bl = [r.high, a.low, s.mid]
             labels = ['A', 'L', 'P', 'R']
-        base_image = create_image(base_volume, tl, tr, bl, size, base_lut)
+        base_image = create_image(args.base_volume, tl, tr, bl, size, base_lut)
         # create_image() will give us an image with transparency if we give a 
         # colormap; we remove the transparency on the base image
         if base_image.mode == 'RGBA':
             base_image = base_image.convert('RGB')
-        if overlay_volume:
+        if args.overlay:
             overlay_image = create_image(
-                overlay_volume, 
+                args.overlay, 
                 tl, 
                 tr, 
                 bl, 
