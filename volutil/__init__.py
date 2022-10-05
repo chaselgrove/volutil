@@ -2,7 +2,7 @@
 
 import numpy as np
 
-__version__ = '0.2.0'
+__version__ = '0.3.0'
 
 def load_lut(fname):
     """Load and validate a FreeSurfer look up table, reporting errors."""

@@ -14,3 +14,7 @@ https://github.com/chaselgrove/volutil
     Fix version (0.0.1) in CHANGES.
 
     Include CHANGES in distribution.
+
+0.3.0 -- 5 October 2022
+
+    Fix integer conversion for LUT in vol-slice.
