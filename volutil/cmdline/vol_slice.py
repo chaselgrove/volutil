@@ -114,7 +114,7 @@ def create_image(vol, tl, tr, bl, size, lut=None):
     data.shape = (size, size)
     data = data.transpose()
     if lut:
-        im = PIL.Image.fromarray(np.array(data, dtype='uint8'))
+        im = PIL.Image.fromarray(np.array(np.rint(data), dtype='uint8'))
         palette = [0, 0, 0, 0]
         for index in range(1, 256):
             if index in lut:
